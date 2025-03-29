@@ -61,7 +61,7 @@ export const NotificationService = {
   // Bildirimde gösterilecek içeriği oluştur
   createNotificationContent: (word: Word) => {
     return {
-      title: `Kelime Hatırlatması: ${word.english}`,
+      title: `${word.english}`,
       body: `Anlamı: ${word.turkish}`,
       data: { wordId: word.id }
     };

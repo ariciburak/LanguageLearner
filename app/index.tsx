@@ -10,6 +10,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useNavigation } from '@react-navigation/native';
+import { Stack } from 'expo-router';
 
 // Global fonksiyon için declare
 declare global {
@@ -17,6 +19,7 @@ declare global {
 }
 
 export default function WordPoolScreen() {
+  const navigation = useNavigation();
   const [words, setWords] = useState<Word[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
@@ -53,6 +56,8 @@ export default function WordPoolScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   // Filtreleme için state'ler
   const [filterType, setFilterType] = useState<'all' | 'learned' | 'notLearned'>('all');
+  // Bildirim havuzunda olan kelimeleri filtrelemek için yeni state ekle
+  const [showNotificationWords, setShowNotificationWords] = useState(false);
 
   // Global bildirim modal açma fonksiyonunu ayarla
   useEffect(() => {
@@ -64,6 +69,26 @@ export default function WordPoolScreen() {
       global.openNotificationModal = undefined;
     };
   }, []);
+
+  // Header'a bildirim butonunu ekle
+  React.useEffect(() => {
+    // Header sağ tarafına bildirim butonu ekleme
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity 
+          onPress={() => {
+            if (Platform.OS === 'ios') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
+            setNotificationModalVisible(true);
+          }}
+          style={{ marginRight: 16 }}
+        >
+          <MaterialIcons name="notifications" size={24} color="#0284c7" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   // Kelimeleri yükle
   const loadWords = async () => {
@@ -263,11 +288,16 @@ export default function WordPoolScreen() {
 
   // Filtrelenmiş kelimeler
   const filteredWords = words.filter(word => {
-    // Önce filtre tipine göre kontrol et
+    // Önce ana filtre tipine göre kontrol et
     if (filterType === 'learned' && !word.isLearned) {
       return false;
     }
     if (filterType === 'notLearned' && word.isLearned) {
+      return false;
+    }
+    
+    // Eğer bildirim filtresi aktifse, sadece bildirim havuzunda olan kelimeleri göster
+    if (showNotificationWords && !word.inNotificationPool) {
       return false;
     }
     
@@ -1054,86 +1084,116 @@ export default function WordPoolScreen() {
         ) : null}
       </View>
       
-      {/* Filtreleme Seçenekleri - Görseldeki gibi sade oval butonlar */}
+      {/* Filtreleme Seçenekleri - Ana grup ve bildirim toggle'ı */}
       <View style={styles.filterOptionsContainer}>
-        <TouchableOpacity
-          style={[
-            styles.filterChip,
-            filterType === 'all' && styles.activeFilterChip
-          ]}
-          onPress={() => {
-            setFilterType('all');
-            if (Platform.OS === 'ios') {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }
-          }}
-        >
-          <MaterialIcons
-            name="list"
-            size={16}
-            color={filterType === 'all' ? '#0284c7' : '#64748b'}
-          />
-          <ThemedText
+        <View style={styles.mainFilterGroup}>
+          <TouchableOpacity
             style={[
-              styles.filterChipText,
-              filterType === 'all' && styles.activeFilterChipText
+              styles.filterChip,
+              filterType === 'all' && styles.activeFilterChip
             ]}
+            onPress={() => {
+              setFilterType('all');
+              if (Platform.OS === 'ios') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
+            }}
           >
-            Tümü
-          </ThemedText>
-        </TouchableOpacity>
+            <MaterialIcons
+              name="list"
+              size={16}
+              color={filterType === 'all' ? '#0284c7' : '#64748b'}
+            />
+            <ThemedText
+              style={[
+                styles.filterChipText,
+                filterType === 'all' && styles.activeFilterChipText
+              ]}
+            >
+              Tümü
+            </ThemedText>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.filterChip,
-            filterType === 'learned' && styles.activeFilterChip
-          ]}
-          onPress={() => {
-            setFilterType('learned');
-            if (Platform.OS === 'ios') {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }
-          }}
-        >
-          <MaterialIcons
-            name="check-circle"
-            size={16}
-            color={filterType === 'learned' ? '#0284c7' : '#64748b'}
-          />
-          <ThemedText
+          <TouchableOpacity
             style={[
-              styles.filterChipText,
-              filterType === 'learned' && styles.activeFilterChipText
+              styles.filterChip,
+              filterType === 'learned' && styles.activeFilterChip
             ]}
+            onPress={() => {
+              setFilterType('learned');
+              if (Platform.OS === 'ios') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
+            }}
           >
-            Öğrenilmiş
-          </ThemedText>
-        </TouchableOpacity>
+            <MaterialIcons
+              name="check-circle"
+              size={16}
+              color={filterType === 'learned' ? '#0284c7' : '#64748b'}
+            />
+            <ThemedText
+              style={[
+                styles.filterChipText,
+                filterType === 'learned' && styles.activeFilterChipText
+              ]}
+            >
+              Öğrenilmiş
+            </ThemedText>
+          </TouchableOpacity>
 
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              filterType === 'notLearned' && styles.activeFilterChip
+            ]}
+            onPress={() => {
+              setFilterType('notLearned');
+              if (Platform.OS === 'ios') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
+            }}
+          >
+            <MaterialIcons
+              name="refresh"
+              size={16}
+              color={filterType === 'notLearned' ? '#0284c7' : '#64748b'}
+            />
+            <ThemedText
+              style={[
+                styles.filterChipText,
+                filterType === 'notLearned' && styles.activeFilterChipText
+              ]}
+            >
+              Öğrenilmemiş
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bildirim havuzu toggle butonu */}
         <TouchableOpacity
           style={[
-            styles.filterChip,
-            filterType === 'notLearned' && styles.activeFilterChip
+            styles.notificationFilterChip,
+            showNotificationWords && styles.activeFilterChip
           ]}
           onPress={() => {
-            setFilterType('notLearned');
+            setShowNotificationWords(!showNotificationWords);
             if (Platform.OS === 'ios') {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }
           }}
         >
           <MaterialIcons
-            name="refresh"
+            name="notifications"
             size={16}
-            color={filterType === 'notLearned' ? '#0284c7' : '#64748b'}
+            color={showNotificationWords ? '#0284c7' : '#64748b'}
           />
           <ThemedText
             style={[
               styles.filterChipText,
-              filterType === 'notLearned' && styles.activeFilterChipText
+              showNotificationWords && styles.activeFilterChipText
             ]}
           >
-            Öğrenilmemiş
+            Bildirim Havuzu
           </ThemedText>
         </TouchableOpacity>
       </View>
@@ -1523,10 +1583,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   filterOptionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
     marginBottom: 16,
     paddingHorizontal: 1,
+    gap: 8,
+  },
+  mainFilterGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   filterChip: {
     flexDirection: 'row',
@@ -1539,6 +1603,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     flex: 1,
+    marginHorizontal: 3,
+  },
+  notificationFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     marginHorizontal: 3,
   },
   activeFilterChip: {
